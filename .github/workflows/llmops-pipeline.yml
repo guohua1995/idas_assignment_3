@@ -1,0 +1,41 @@
+name: LLMOps Pipeline
+
+# Run workflow on push to main or PR
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout your code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Build Docker image
+      - name: Build Docker image
+        run: docker build -t fastapi-app:latest .
+
+      # 3. Scan image with Trivy
+      - name: Scan Docker image with Trivy
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image fastapi-app:latest
+
+      # 4. Log in to Docker Hub
+      - name: Log in to Docker Hub
+        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 5.Push Docker image
+      - name: Push Docker image
+        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
+        run: |
+          docker tag fastapi-app:latest ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
